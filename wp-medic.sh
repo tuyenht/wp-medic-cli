@@ -1,10 +1,10 @@
 #!/bin/bash
 # ==============================================================================
-# 🛡️ WP-MEDIC CLI (v1.2.0)
+# 🛡️ WP-MEDIC CLI (v1.3.0)
 # Tác giả: TuyenHT
 # Chức năng: Hệ thống Thanh trừng mã độc & Tự động hóa Bảo mật WP (Plesk/Linux)
 # Github: https://github.com/tuyenht/wp-medic-cli
-VERSION="1.2.0"
+VERSION="1.3.0"
 # ==============================================================================
 
 # --- MÀU SẮC & GIAO DIỆN (UI) ---
@@ -211,6 +211,15 @@ process_domain() {
 
     # [MODULE 3.2] FILE SYSTEM NUKE & PAVE
     log_msg "INFO" "-> Nuke & Pave (Tái tạo Core Files)..."
+    
+    # Ghi nhận phiên bản WP hiện tại TRƯỜC khi nuke (để fallback tải đúng version, tránh nâng cấp bất ngờ)
+    local wp_version=$(run_wp "$sys_user" "$doc_root" core version 2>/dev/null | tr -d '\r')
+    if [[ -z "$wp_version" ]]; then
+        # Không xác định được version -> tự phát hiện từ file version.php
+        wp_version=$(grep "\$wp_version =" "$doc_root/wp-includes/version.php" 2>/dev/null | grep -oP "[0-9]+\.[0-9\.]+")
+    fi
+    log_msg "INFO" "   Phiên bản WP hiện tại: ${wp_version:-không xác định}"
+    
     # Cơ chế Safe-Nuke-and-Pave bảo vệ an toàn hệ thống tránh nghẽn mạng
     local backup_dir_admin="${doc_root}/wp-admin.bak"
     local backup_dir_includes="${doc_root}/wp-includes.bak"
@@ -225,10 +234,20 @@ process_domain() {
     
     # Strategy 2: Fallback bằng tar.gz nếu WP-CLI thất bại (thiếu ZipArchive, lỗi mạng...)
     if [[ $dl_status -ne 0 ]] || [[ ! -d "$doc_root/wp-admin" ]] || [[ ! -d "$doc_root/wp-includes" ]]; then
-        log_msg "WARN" "-> WP-CLI core download thất bại. Chuyển sang Fallback (tar.gz từ WordPress.org)..."
+        # Xác định URL tải đúng phiên bản WP (tránh nâng cấp bất ngờ vỡ plugin/theme)
+        local tar_url="https://wordpress.org/latest.tar.gz"
+        if [[ -n "$wp_version" ]]; then
+            tar_url="https://wordpress.org/wordpress-${wp_version}.tar.gz"
+        fi
+        log_msg "WARN" "-> WP-CLI thất bại. Fallback tar.gz (v${wp_version:-latest})..."
         local tmp_dir=$(mktemp -d)
-        curl -sL -o "$tmp_dir/wordpress.tar.gz" https://wordpress.org/latest.tar.gz 2>/dev/null
-        if [[ -f "$tmp_dir/wordpress.tar.gz" ]]; then
+        curl -sL --connect-timeout 10 -m 60 -o "$tmp_dir/wordpress.tar.gz" "$tar_url" 2>/dev/null
+        # Nếu phiên bản cũ không còn trên server, fallback về latest
+        if [[ ! -s "$tmp_dir/wordpress.tar.gz" && "$tar_url" != *"latest"* ]]; then
+            log_msg "WARN" "   Phiên bản $wp_version không tìm thấy, dùng bản mới nhất..."
+            curl -sL --connect-timeout 10 -m 60 -o "$tmp_dir/wordpress.tar.gz" https://wordpress.org/latest.tar.gz 2>/dev/null
+        fi
+        if [[ -s "$tmp_dir/wordpress.tar.gz" ]]; then
             tar -xzf "$tmp_dir/wordpress.tar.gz" -C "$tmp_dir" 2>/dev/null
             if [[ -d "$tmp_dir/wordpress/wp-admin" ]]; then
                 cp -rf "$tmp_dir/wordpress/wp-admin" "$doc_root/wp-admin"
