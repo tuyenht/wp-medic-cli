@@ -214,11 +214,18 @@ process_domain() {
         log_msg "ERROR" "-> Thất bại khi tải Core (Lỗi mạng/Timeout). Tiến hành khôi phục phiên bản trước đó..."
         if [[ -d "$backup_dir_admin" ]]; then mv "$backup_dir_admin" "$doc_root/wp-admin"; fi
         if [[ -d "$backup_dir_includes" ]]; then mv "$backup_dir_includes" "$doc_root/wp-includes"; fi
+        
+        # Đồng bộ phân quyền sở hữu động để tránh lỗi 500/403 sau khi rollback bằng quyền root
+        local doc_root_group=$(stat -c '%g' "$doc_root" 2>/dev/null)
+        if [[ -z "$doc_root_group" ]]; then doc_root_group="psacln"; fi
+        chown -R "$sys_user:$doc_root_group" "$doc_root/wp-admin" "$doc_root/wp-includes" 2>/dev/null
+        
         append_json "core_status" "download_failed_rolled_back"
     fi
     
     log_msg "INFO" "-> Càn quét Uploads & Caches..."
-    find "$doc_root/wp-content/uploads" -type f \( -name "*.php" -o -name "*.phtml" -o -name "*.js" -o -name "*.py" -o -name "*.pl" \) -delete 2>/dev/null
+    # Bảo toàn file .js hợp lệ của plugin giao diện, chỉ triệt tiêu 100% mã thực thi nguy hiểm
+    find "$doc_root/wp-content/uploads" -type f \( -name "*.php" -o -name "*.phtml" -o -name "*.py" -o -name "*.pl" -o -name "*.suspected" \) -delete 2>/dev/null
     rm -rf "$doc_root/wp-content/cache" "$doc_root/wp-content/w3tc-config" "$doc_root/wp-content/litespeed" 2>/dev/null
 
     # [MODULE 3.3] FLUSH REWRITE
@@ -235,8 +242,9 @@ process_domain() {
     local db_user=$(run_wp "$sys_user" "$doc_root" config get DB_USER 2>/dev/null | tr -d '\r')
     if [[ -n "$db_user" ]]; then
         local new_db_pass=$(head -c 100 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 24)
-        plesk bin database --update-dbuser "$db_user" -passwd "$new_db_pass" &>/dev/null
+        # Đảo ngược trình tự: Cập nhật wp-config.php trước khi đổi trên DB Server để tránh mất kết nối giữa chừng gây crash lệnh
         run_wp "$sys_user" "$doc_root" config set DB_PASSWORD "$new_db_pass" 2>/dev/null
+        plesk bin database --update-dbuser "$db_user" -passwd "$new_db_pass" &>/dev/null
     fi
     run_wp "$sys_user" "$doc_root" config shuffle-salts 2>/dev/null
 
