@@ -180,6 +180,7 @@ process_domain() {
     # [MODULE 3.1] DATABASE FORENSICS
     # Lấy Table Prefix thực tế của Website (chống lỗi hardcode 'wp_')
     local db_prefix=$(run_wp "$sys_user" "$doc_root" config get table_prefix 2>/dev/null | tr -d '\r')
+    db_prefix=$(echo "$db_prefix" | tr -dc 'a-zA-Z0-9_')
     if [[ -z "$db_prefix" ]]; then db_prefix="wp_"; fi
 
     log_msg "INFO" "-> Khóa & Tiêu diệt Spam Comments/Pingbacks (Prefix: $db_prefix)..."
@@ -195,8 +196,26 @@ process_domain() {
 
     # [MODULE 3.2] FILE SYSTEM NUKE & PAVE
     log_msg "INFO" "-> Nuke & Pave (Tái tạo Core Files)..."
-    rm -rf "$doc_root/wp-admin" "$doc_root/wp-includes"
+    # Cơ chế Safe-Nuke-and-Pave bảo vệ an toàn hệ thống tránh nghẽn mạng
+    local backup_dir_admin="${doc_root}/wp-admin.bak"
+    local backup_dir_includes="${doc_root}/wp-includes.bak"
+    
+    rm -rf "$backup_dir_admin" "$backup_dir_includes"
+    if [[ -d "$doc_root/wp-admin" ]]; then mv "$doc_root/wp-admin" "$backup_dir_admin"; fi
+    if [[ -d "$doc_root/wp-includes" ]]; then mv "$doc_root/wp-includes" "$backup_dir_includes"; fi
+    
     run_wp "$sys_user" "$doc_root" core download --skip-content --force 2>/dev/null
+    local dl_status=$?
+    
+    if [[ $dl_status -eq 0 && -d "$doc_root/wp-admin" && -d "$doc_root/wp-includes" ]]; then
+        rm -rf "$backup_dir_admin" "$backup_dir_includes"
+        log_msg "OK" "-> Tải thành công mã nguồn WordPress Core!"
+    else
+        log_msg "ERROR" "-> Thất bại khi tải Core (Lỗi mạng/Timeout). Tiến hành khôi phục phiên bản trước đó..."
+        if [[ -d "$backup_dir_admin" ]]; then mv "$backup_dir_admin" "$doc_root/wp-admin"; fi
+        if [[ -d "$backup_dir_includes" ]]; then mv "$backup_dir_includes" "$doc_root/wp-includes"; fi
+        append_json "core_status" "download_failed_rolled_back"
+    fi
     
     log_msg "INFO" "-> Càn quét Uploads & Caches..."
     find "$doc_root/wp-content/uploads" -type f \( -name "*.php" -o -name "*.phtml" -o -name "*.js" -o -name "*.py" -o -name "*.pl" \) -delete 2>/dev/null
@@ -209,13 +228,13 @@ process_domain() {
     log_msg "INFO" "-> Xoay vòng Mật khẩu Hệ thống & Salts (Amnesia Protocol)..."
     
     # 4.1 Xoay Plesk SysUser (Password chỉ dùng chữ/số để tương thích tuyệt đối với Plesk API)
-    local new_sys_pass=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 24 | head -n 1)
+    local new_sys_pass=$(head -c 100 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 24)
     plesk bin sysuser -u "$sys_user" -passwd "$new_sys_pass" &>/dev/null
     
     # 4.2 Xoay MySQL Pass & Salts
     local db_user=$(run_wp "$sys_user" "$doc_root" config get DB_USER 2>/dev/null | tr -d '\r')
     if [[ -n "$db_user" ]]; then
-        local new_db_pass=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 24 | head -n 1)
+        local new_db_pass=$(head -c 100 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 24)
         plesk bin database --update-dbuser "$db_user" -passwd "$new_db_pass" &>/dev/null
         run_wp "$sys_user" "$doc_root" config set DB_PASSWORD "$new_db_pass" 2>/dev/null
     fi
@@ -228,7 +247,7 @@ process_domain() {
     
     for admin_user in $admins; do
         # 1. Quét qua và reset mọi mật khẩu Admin
-        local random_hash=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9!@#%^&*' | fold -w 32 | head -n 1)
+        local random_hash=$(head -c 150 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32)
         run_wp "$sys_user" "$doc_root" user update "$admin_user" --user_pass="$random_hash" 2>/dev/null
         
         # 2. Xử lý Username Nhạy cảm (Nuke-and-Reassign)
@@ -256,7 +275,7 @@ process_domain() {
                 if [[ -z "$admin_email" ]]; then admin_email="admin@$domain"; fi
                 
                 # Tạo user mới với hash random để an toàn tuyệt đối
-                local safe_pass=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9!@#%^&*' | fold -w 32 | head -n 1)
+                local safe_pass=$(head -c 150 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32)
                 run_wp "$sys_user" "$doc_root" user create "$new_username" "$admin_email" --role=administrator --user_pass="$safe_pass" 2>/dev/null
                 # Xóa user cũ và chuyển toàn bộ data sang user mới
                 run_wp "$sys_user" "$doc_root" user delete "$admin_user" --reassign="$new_username" 2>/dev/null

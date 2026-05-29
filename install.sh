@@ -71,8 +71,8 @@ if [[ -n "$BAOSON_BRIDGE" ]]; then
     echo -e "    -> Đang kết nối tới: $BAOSON_BRIDGE"
     echo -e "    -> Server ID: $SERVER_ID"
     
-    # Giả lập gửi thông tin đăng ký lên hệ thống Pulse API
-    curl -s -X POST "$BAOSON_BRIDGE" \
+    # Giả lập gửi thông tin đăng ký lên hệ thống Pulse API (bảo vệ bằng Timeout để tránh treo script)
+    curl -s -m 10 --connect-timeout 5 -X POST "$BAOSON_BRIDGE" \
          -H "Content-Type: application/json" \
          -d "{\"server_id\":\"$SERVER_ID\", \"status\":\"wp_medic_installed\", \"token\":\"$BRIDGE_TOKEN\"}" > /dev/null
     
