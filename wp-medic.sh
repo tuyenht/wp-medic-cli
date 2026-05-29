@@ -115,7 +115,8 @@ bootstrap() {
     fi
 
     # Kiểm tra WP-CLI tồn tại (bắt buộc cho mọi thao tác)
-    if ! command -v wp &> /dev/null; then
+    WP_CLI_PATH=$(command -v wp 2>/dev/null)
+    if [[ -z "$WP_CLI_PATH" ]]; then
         log_msg "ERROR" "WP-CLI chưa được cài đặt. Hãy cài đặt trước: https://wp-cli.org/"
         exit 1
     fi
@@ -151,8 +152,8 @@ run_wp() {
     local sys_user=$1
     local doc_root=$2
     shift 2
-    # Bọc lệnh WP-CLI qua sudo để đảm bảo file sinh ra có đúng quyền user của website
-    sudo -u "$sys_user" wp "$@" --path="$doc_root"
+    # Bọc lệnh WP-CLI qua sudo với đường dẫn tuyệt đối để tránh lỗi PATH của sys_user
+    sudo -u "$sys_user" "$WP_CLI_PATH" "$@" --path="$doc_root"
 }
 
 get_domain_info() {
@@ -218,14 +219,39 @@ process_domain() {
     if [[ -d "$doc_root/wp-admin" ]]; then mv "$doc_root/wp-admin" "$backup_dir_admin"; fi
     if [[ -d "$doc_root/wp-includes" ]]; then mv "$doc_root/wp-includes" "$backup_dir_includes"; fi
     
+    # Strategy 1: WP-CLI core download (nhanh, chính xác phiên bản)
     run_wp "$sys_user" "$doc_root" core download --skip-content --force 2>/dev/null
     local dl_status=$?
     
+    # Strategy 2: Fallback bằng tar.gz nếu WP-CLI thất bại (thiếu ZipArchive, lỗi mạng...)
+    if [[ $dl_status -ne 0 ]] || [[ ! -d "$doc_root/wp-admin" ]] || [[ ! -d "$doc_root/wp-includes" ]]; then
+        log_msg "WARN" "-> WP-CLI core download thất bại. Chuyển sang Fallback (tar.gz từ WordPress.org)..."
+        local tmp_dir=$(mktemp -d)
+        curl -sL -o "$tmp_dir/wordpress.tar.gz" https://wordpress.org/latest.tar.gz 2>/dev/null
+        if [[ -f "$tmp_dir/wordpress.tar.gz" ]]; then
+            tar -xzf "$tmp_dir/wordpress.tar.gz" -C "$tmp_dir" 2>/dev/null
+            if [[ -d "$tmp_dir/wordpress/wp-admin" ]]; then
+                cp -rf "$tmp_dir/wordpress/wp-admin" "$doc_root/wp-admin"
+                cp -rf "$tmp_dir/wordpress/wp-includes" "$doc_root/wp-includes"
+                # Sao chép các file root của WP Core (đè lên bản cũ bị tiêm nhiễm)
+                find "$tmp_dir/wordpress" -maxdepth 1 -type f -exec cp -f {} "$doc_root/" \;
+                dl_status=0
+                log_msg "OK" "-> Tải thành công Core qua Fallback tar.gz!"
+            fi
+        fi
+        rm -rf "$tmp_dir"
+    fi
+    
     if [[ $dl_status -eq 0 && -d "$doc_root/wp-admin" && -d "$doc_root/wp-includes" ]]; then
+        # Đồng bộ phân quyền sở hữu cho toàn bộ file mới tải về
+        local doc_root_group=$(stat -c '%g' "$doc_root" 2>/dev/null)
+        if [[ -z "$doc_root_group" ]]; then doc_root_group="psacln"; fi
+        chown -R "$sys_user:$doc_root_group" "$doc_root/wp-admin" "$doc_root/wp-includes" 2>/dev/null
+        chown "$sys_user:$doc_root_group" "$doc_root"/*.php "$doc_root"/*.html "$doc_root"/*.txt 2>/dev/null
         rm -rf "$backup_dir_admin" "$backup_dir_includes"
-        log_msg "OK" "-> Tải thành công mã nguồn WordPress Core!"
+        log_msg "OK" "-> Hoàn tất tái tạo mã nguồn WordPress Core!"
     else
-        log_msg "ERROR" "-> Thất bại khi tải Core (Lỗi mạng/Timeout). Tiến hành khôi phục phiên bản trước đó..."
+        log_msg "ERROR" "-> Tất cả các chiến lược tải Core đều thất bại. Tiến hành khôi phục phiên bản trước đó..."
         if [[ -d "$backup_dir_admin" ]]; then mv "$backup_dir_admin" "$doc_root/wp-admin"; fi
         if [[ -d "$backup_dir_includes" ]]; then mv "$backup_dir_includes" "$doc_root/wp-includes"; fi
         
