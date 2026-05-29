@@ -256,7 +256,8 @@ process_domain() {
                 if [[ -z "$admin_email" ]]; then admin_email="admin@$domain"; fi
                 
                 # Tạo user mới với hash random để an toàn tuyệt đối
-                run_wp "$sys_user" "$doc_root" user create "$new_username" "$admin_email" --role=administrator --user_pass="$(openssl rand -base64 32)" 2>/dev/null
+                local safe_pass=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9!@#%^&*' | fold -w 32 | head -n 1)
+                run_wp "$sys_user" "$doc_root" user create "$new_username" "$admin_email" --role=administrator --user_pass="$safe_pass" 2>/dev/null
                 # Xóa user cũ và chuyển toàn bộ data sang user mới
                 run_wp "$sys_user" "$doc_root" user delete "$admin_user" --reassign="$new_username" 2>/dev/null
                 
