@@ -1,11 +1,11 @@
 #!/bin/bash
 # ==============================================================================
-# 🛡️ WP-MEDIC CLI (v1.4.0) — Unified Security Engine
+# 🛡️ WP-MEDIC CLI (v1.4.0) — WordPress Emergency Security Toolkit
 # Tác giả: TuyenHT
-# Chức năng: Hệ thống Thanh trừng mã độc & Tự động hóa Bảo mật WP
-#            Tích hợp Diamond Vaccine v5.0 (Zero-Trust Malware Vaccine)
+# Chức năng: Phát hiện & loại bỏ mã độc, tái tạo Core, xoay vòng mật khẩu,
+#            quét malware chuyên sâu, và tự động kiểm tra sức khỏe website.
 # Github: https://github.com/tuyenht/wp-medic-cli
-# Tương thích: Plesk / cPanel / Standalone Linux (Auto-detect)
+# Tương thích: Plesk / cPanel / Standalone Linux (tự động phát hiện)
 VERSION="1.4.0"
 # ==============================================================================
 
@@ -287,13 +287,14 @@ imunify360_restore() {
 }
 
 # =============================================================================
-# MODULE VACCINE: DEEP MALWARE KILL (Tích hợp từ Diamond Vaccine v5.0)
-# Quét & diệt các loại mã độc đặc thù mà Core Nuke không xử lý được
+# MODULE VACCINE: DEEP MALWARE KILL
+# Quét & diệt các loại mã độc chuyên sâu mà Core Nuke không xử lý được
+# (db.php drop-in, zip:// wrapper injection, webshell payloads)
 # Graceful: Hoạt động 100% standalone, không phụ thuộc bất kỳ panel nào
 # =============================================================================
 deep_malware_kill() {
     local doc_root=$1
-    log_msg "INFO" "-> Deep Malware Kill (Diamond Vaccine)..."
+    log_msg "INFO" "-> Quét mã độc chuyên sâu (Deep Malware Kill)..."
 
     # 1. Quét & xóa db.php drop-in độc hại (bỏ qua W3TC, Query Monitor, Redis)
     local db_dropin="$doc_root/wp-content/db.php"
@@ -304,16 +305,34 @@ deep_malware_kill() {
         fi
     fi
 
-    # 2. Xóa zip:// wrapper injection & obfuscated implode patterns
-    find "$doc_root" -name "*.php" -type f -exec grep -lE 'U2k2A|require.*implode|zip://' {} \; 2>/dev/null | while read -r infected; do
-        sed -i '/U2k2A/d; /require.*implode/d; /zip:\/\//d' "$infected" 2>/dev/null
-        log_msg "WARN" "   Xóa injection pattern trong: $(basename "$infected")"
+    # 2. Xóa zip:// wrapper injection & obfuscated base64 payloads
+    #    CHỈ quét thư mục root + mu-plugins + uploads (bỏ qua plugins/themes để tránh false positive)
+    local scan_dirs=(
+        "$doc_root"
+        "$doc_root/wp-content/mu-plugins"
+        "$doc_root/wp-content/uploads"
+    )
+    for scan_dir in "${scan_dirs[@]}"; do
+        [[ ! -d "$scan_dir" ]] && continue
+        # Chỉ quét maxdepth 1 cho root, recursive cho mu-plugins/uploads
+        local depth_flag=""
+        if [[ "$scan_dir" == "$doc_root" ]]; then
+            depth_flag="-maxdepth 1"
+        fi
+        find "$scan_dir" $depth_flag -name "*.php" -type f 2>/dev/null | while read -r phpfile; do
+            if grep -qE 'U2k2A|zip://|eval\(base64_decode|eval\(gzinflate|\$GLOBALS\[.{0,3}\]\(' "$phpfile" 2>/dev/null; then
+                sed -i '/U2k2A/d; /zip:\/\//d' "$phpfile" 2>/dev/null
+                log_msg "WARN" "   Xóa injection trong: $(basename "$phpfile")"
+            fi
+        done
     done
 
-    # 3. Xóa payload đặc trưng của hacker
+    # 3. Xóa payload đặc trưng của hacker (webshell files)
     local payload_count=0
-    for payload_name in "cha.php" "cha1.php" "x.php" "shell.php" "c99.php" "r57.php" "wso.php"; do
-        if find "$doc_root" -name "$payload_name" -delete 2>/dev/null | grep -q .; then
+    for payload_name in "cha.php" "cha1.php" "x.php" "shell.php" "c99.php" "r57.php" "wso.php" "b374k.php" "alfa.php"; do
+        local found=$(find "$doc_root" -name "$payload_name" -type f 2>/dev/null)
+        if [[ -n "$found" ]]; then
+            find "$doc_root" -name "$payload_name" -type f -delete 2>/dev/null
             log_msg "WARN" "   Tiêu diệt payload: $payload_name"
             payload_count=$((payload_count + 1))
         fi
@@ -322,7 +341,7 @@ deep_malware_kill() {
     # 4. Xóa file .zip khả nghi tải lên gần đây (trong vòng 3 ngày)
     find "$doc_root/wp-content/uploads" -name "*.zip" -mtime -3 -delete 2>/dev/null
 
-    log_msg "OK" "   Deep Malware Kill hoàn tất."
+    log_msg "OK" "   Quét mã độc chuyên sâu hoàn tất."
 }
 
 # =============================================================================
