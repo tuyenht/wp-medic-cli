@@ -461,6 +461,12 @@ process_domain() {
     log_msg "INFO" "Đã xác thực Chủ sở hữu: $sys_user"
 
     # ===========================================================
+    # [PRE-OP] MỞ KHÓA wp-config.php (có thể bị Diamond Vaccine/lần chạy trước khóa 400)
+    # WP-CLI cần đọc file này suốt quá trình phẫu thuật
+    # ===========================================================
+    chmod 644 "$doc_root/wp-config.php" 2>/dev/null
+
+    # ===========================================================
     # [MODULE 0] IMUNIFY360 BRIDGE — Giải trừ blacklist trước phẫu thuật
     # ===========================================================
     imunify360_bridge "$domain" "$doc_root"
@@ -714,23 +720,25 @@ process_domain() {
     fi
 
     # ===========================================================
-    # [MODULE 7] HARDENING — Đóng băng bảo mật (Fix Bug #2)
-    # ===========================================================
-    log_msg "INFO" "-> Đóng băng bảo mật (Diamond Hardening)..."
-    # wp-config.php: CHỈ owner được đọc (bảo vệ DB credentials)
-    chmod 400 "$doc_root/wp-config.php" 2>/dev/null
-    chown "$sys_user:$doc_root_group" "$doc_root/wp-config.php" 2>/dev/null
-    log_msg "OK" "   wp-config.php → chmod 400 (Khóa cứng credentials)"
-
-    # ===========================================================
-    # [MODULE 8] IMUNIFY360 RESTORE — Gỡ ignore tạm, trả lại bảo vệ
+    # [MODULE 7] IMUNIFY360 RESTORE — Gỡ ignore tạm, trả lại bảo vệ
     # ===========================================================
     imunify360_restore "$doc_root"
 
     # ===========================================================
-    # [MODULE 9] POST-OP HEALTHCHECK — Kiểm tra website sống
+    # [MODULE 8] POST-OP HEALTHCHECK — Kiểm tra website sống
+    # Chạy TRƯỚC khi khóa wp-config.php để rollback vẫn hoạt động
     # ===========================================================
     post_op_healthcheck "$domain" "$old_db_pass" "$db_user" "$doc_root" "$sys_user"
+
+    # ===========================================================
+    # [MODULE 9] HARDENING — Đóng băng bảo mật (Fix Bug #2)
+    # Chạy SAU CÙNG để không ảnh hưởng WP-CLI và rollback
+    # ===========================================================
+    log_msg "INFO" "-> Đóng băng bảo mật (Diamond Hardening)..."
+    chmod 400 "$doc_root/wp-config.php" 2>/dev/null
+    local doc_root_group_final=$(stat -c '%G' "$doc_root" 2>/dev/null)
+    chown "$sys_user:${doc_root_group_final:-psacln}" "$doc_root/wp-config.php" 2>/dev/null
+    log_msg "OK" "   wp-config.php → chmod 400 (Khóa cứng credentials)"
 
     log_msg "OK" "Hoàn tất làm sạch & Đóng băng $domain!"
     append_json "actions_$domain" "success"
