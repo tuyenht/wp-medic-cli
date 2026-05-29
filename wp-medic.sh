@@ -262,11 +262,11 @@ imunify360_bridge() {
     imunify360-agent config update '{"PROACTIVE_DEFENCE": {"mode": "KILL"}}' &>/dev/null
 
     # 2. Cleanup toàn bộ malicious entries liên quan đến domain
-    #    Sử dụng cleanup-all cho background cleanup
-    imunify360-agent malware malicious cleanup-all &>/dev/null &
+    #    Chạy SYNCHRONOUS (đợi xong) để blacklist thực sự sạch trước Nuke & Pave
+    imunify360-agent malware malicious cleanup-all &>/dev/null
+    sleep 2  # Chờ inotify settle sau cleanup
 
     # 3. Tạm tắt realtime scan cho doc_root trong quá trình phẫu thuật
-    #    bằng cách thêm vào ignore list
     imunify360-agent malware ignore add "$doc_root/wp-admin" &>/dev/null
     imunify360-agent malware ignore add "$doc_root/wp-includes" &>/dev/null
 
@@ -593,8 +593,20 @@ process_domain() {
     fi
 
     # ===========================================================
-    # [MODULE 3] DEEP MALWARE KILL (Diamond Vaccine Engine)
+    # [MODULE 3] DEEP MALWARE KILL
     # ===========================================================
+    # Trước khi quét malware, fix bất kỳ file nào bị Imunify360 khóa 000
+    # (Imunify có thể khóa lại file mới sau Nuke & Pave qua inotify)
+    if [[ $HAS_IMUNIFY -eq 1 ]]; then
+        local locked_count=$(find "$doc_root" -type f -perm 000 2>/dev/null | wc -l)
+        if [[ $locked_count -gt 0 ]]; then
+            find "$doc_root" -type f -perm 000 -exec chmod 644 {} + 2>/dev/null
+            chown -R "$sys_user:$doc_root_group" "$doc_root/wp-admin" "$doc_root/wp-includes" 2>/dev/null
+            log_msg "WARN" "   Imunify360 đã khóa $locked_count file (000) — đã mở khóa lại."
+            # Cleanup lại blacklist sau khi mở khóa
+            imunify360-agent malware malicious cleanup-all &>/dev/null
+        fi
+    fi
     deep_malware_kill "$doc_root"
     
     # ===========================================================
