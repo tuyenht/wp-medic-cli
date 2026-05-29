@@ -1,107 +1,90 @@
-# 🛡️ WP-Medic CLI (Diamond Edition)
-
 <div align="center">
-  <p><strong>Cỗ Máy Thanh Trừng Mã Độc & Tự Động Hóa Bảo Mật WordPress Tối Thượng Dành Cho Máy Chủ Plesk/Linux.</strong></p>
-  <a href="https://github.com/tuyenht/wp-medic-cli">Tài liệu tham khảo</a> •
-  <a href="#-tính-năng-cốt-lõi">Tính năng</a> •
-  <a href="#-cài-đặt">Cài đặt</a> •
-  <a href="#-hướng-dẫn-sử-dụng">Sử dụng</a>
+  <h1>🛡️ WP-Medic CLI</h1>
+  <p><strong>Cỗ máy 1-Click tự động diệt sạch mã độc, phục hồi Core WordPress và xoay vòng bảo mật.</strong></p>
+  <a href="#introduction">Giới thiệu</a> •
+  <a href="#features">Tính năng</a> •
+  <a href="#installation">Cài đặt 1-Click</a> •
+  <a href="#usage">Sử dụng</a>
 </div>
 
 ---
 
-**WP-Medic CLI** không phải là một công cụ quét virus thông thường (Antivirus Scanner). Đây là một hệ thống **Surgical Incident Response (Ứng cứu sự cố phẫu thuật)** được xây dựng dựa trên tiêu chuẩn bảo mật *Diamond++*. 
+<h2 id="introduction">🌟 Giới thiệu (Introduction)</h2>
 
-Thay vì sử dụng phương pháp "Blacklist" (quét và xóa file nghi ngờ) vốn đầy rẫy lỗ hổng và bỏ sót mã độc, WP-Medic áp dụng chiến thuật **"Whitelist Isolation" & "Nuke and Pave"**. Cỗ máy này phá hủy hoàn toàn phần Lõi (Core) của hệ thống cũ và tái thiết lập (Pave) lại bản gốc tinh khiết từ WordPress.org, kết hợp xoay vòng toàn bộ Danh tính (Identity) chỉ trong vài giây.
+**WP-Medic CLI** không phải là một công cụ quét virus (Scanner) thông thường. Khi website của bạn bị nhiễm mã độc, việc quét và xóa từng file thường không triệt để và dễ bị tái nhiễm.
 
-## 🌟 Tính năng Cốt Lõi (Core Features)
+Công cụ này sử dụng phương pháp **"Phá hủy và Tái tạo" (Nuke & Pave)**:
+1. Phá hủy toàn bộ các file hệ thống (Core) có nguy cơ bị tiêm nhiễm mã độc.
+2. Tải về nguyên bản sạch 100% từ máy chủ chính thức của WordPress.org.
+3. Giữ nguyên vẹn 100% dữ liệu bài viết, hình ảnh, sản phẩm và cấu hình của bạn.
 
-### 1. Zero-Blind Trust: Xóa Sổ File & Phục Hồi (Nuke & Pave)
-- Xóa sạch 100% các file thực thi `.php` tại thư mục gốc (Ngoại trừ `wp-config.php`).
-- Băm nát thư mục `wp-admin` và `wp-includes` và tải đè bản mới bằng WP-CLI.
-- Tự động quét và diệt Webshell ẩn giấu trong `wp-content/uploads`.
-
-### 2. Quản Trị Danh Tính Tự Động (Identity & Access Automation)
-- Sinh mật khẩu ngẫu nhiên (High-Entropy) và **Đổi Mật khẩu Database** tự động qua Plesk API.
-- Bắt buộc **Khởi tạo lại Mật khẩu** toàn bộ Admin (The Amnesia Protocol).
-- **Interactive Audit:** Khuyến cáo và gợi ý đổi các Username nhạy cảm (như `admin`, `root`) thành các tên an toàn mang dấu ấn thương hiệu (VD: `tênmiền_admin`).
-
-### 3. Xóa sổ Rác Database (Database Forensics)
-- Lọc máu Spam Comments: Xóa sạch hàng chục ngàn bình luận spam chỉ trong chớp mắt bằng Regex (`casino|bet|viagra...`).
-- Xóa rác SEO ảo (SEO Spam Post/Pages).
-- Khóa vĩnh viễn (Lockdown) tính năng Comment trên **TẤT CẢ** các bài viết cũ và mới để chặn đường lùi của Botnet.
-
-### 4. Tương Thích ChatOps & Telegram Bot
-- Chế độ **Headless (Câm lặng)** chạy bằng cờ `--auto-yes`.
-- Giao thức đầu ra **JSON Output** (`--output json`) cho phép dễ dàng tích hợp API và điều khiển từ xa qua Telegram Bot mà không cần login SSH.
+Tất cả diễn ra hoàn toàn tự động chỉ với **1 dòng lệnh**, cực kỳ dễ sử dụng ngay cả khi bạn không rành về kỹ thuật Server.
 
 ---
 
-## 🚀 Cài Đặt (Installation)
+<h2 id="features">✨ Tính năng Cốt lõi (Core Features)</h2>
 
-WP-Medic CLI là một file Bash thực thi độc lập (Standalone Portable Binary). Không cần cài đặt dependencies cồng kềnh, chỉ cần Server của bạn có sẵn WP-CLI và Plesk.
+- 🧹 **Tái tạo Lõi Tự động:** Xóa trắng `wp-admin`, `wp-includes` và tải lại bản sạch.
+- 🔐 **Xoay vòng Bảo mật:** Tự động đổi mật khẩu Database, đổi khóa Salts và vô hiệu hóa các kết nối FTP trái phép.
+- 🛡️ **Quản trị Danh tính (Identity Audit):** Tự động cảnh báo và hướng dẫn bạn đổi các tên đăng nhập nguy hiểm (như `admin`, `root`) sang tên an toàn.
+- 🗑️ **Lọc máu Database:** Xóa sạch hàng chục ngàn bình luận Spam, SEO ẩn giấu sâu trong cơ sở dữ liệu.
+- 🤖 **Thân thiện Tự động hóa:** Hỗ trợ xuất dữ liệu JSON để điều khiển từ xa qua Telegram Bot hoặc API.
 
-Chạy lệnh sau dưới quyền `root`:
+---
+
+<h2 id="installation">🚀 Cài Đặt (Installation)</h2>
+
+Chỉ mất 3 giây để cài đặt. Truy cập vào SSH (quyền root) trên Server của bạn và chạy duy nhất 1 dòng lệnh này:
+
 ```bash
 curl -sL https://raw.githubusercontent.com/tuyenht/wp-medic-cli/main/install.sh | bash
 ```
-Lệnh trên sẽ tải file cấu hình, phân quyền thực thi (`chmod +x`) và đặt vào `/usr/local/bin/wp-medic`.
+
+*Hệ thống sẽ tự động tải công cụ và thiết lập lệnh `wp-medic` cho Server của bạn.*
 
 ---
 
-## 🛠 Hướng Dẫn Sử Dụng (Usage)
+<h2 id="usage">💻 Hướng Dẫn Sử Dụng (Usage)</h2>
 
-### 1. Chế độ Bắn Tỉa (Cứu Hộ 1 Website)
-Sử dụng khi khách hàng báo cáo 1 website cụ thể bị nhiễm độc.
+Sau khi cài đặt, bạn có thể gọi công cụ này ở bất kỳ đâu trên Server.
+
+### 1. Cứu Hộ Nhanh 1 Website (Bắn Tỉa)
+Nếu bạn có một website tên là `example.com` bị nhiễm mã độc, hãy chạy lệnh:
 ```bash
 wp-medic --domain example.com
 ```
 
-### 2. Chế độ Quét Rải Thảm Toàn Server (Mass Quarantine)
-Tool tự động móc nối Plesk API, lấy danh sách toàn bộ domains, tìm kiếm cài đặt WordPress và áp dụng SOP làm sạch toàn diện lên hàng trăm website xuyên đêm.
-```bash
-wp-medic --all-domains
-```
-
-### 3. Chế độ Kiểm Toán (Dry-Run / Audit Mode)
-An toàn tuyệt đối. Phân tích, thống kê những file sẽ bị xóa, số lượng spam comment phát hiện, nhưng không thao tác thực tế.
+### 2. Chạy Thử Nghiệm An Toàn (Dry-Run)
+Công cụ sẽ quét, thống kê và báo cáo những gì nó MONG MUỐN làm (như số lượng file sẽ bị xóa, số user nguy hiểm), nhưng **KHÔNG** thực sự xóa bất kỳ dữ liệu nào.
 ```bash
 wp-medic --domain example.com --dry-run
 ```
 
-### 4. Chế độ ChatOps (Tích hợp Bot/API)
-Chạy tự động 100% không cần tương tác (Non-interactive) và trả về định dạng JSON chuẩn.
+### 3. Càn Quét Toàn Bộ Server (Dành riêng cho Plesk)
+Lệnh này sẽ lấy danh sách toàn bộ các website đang có trên Server Plesk của bạn, và tự động làm sạch từng website một xuyên đêm.
 ```bash
-wp-medic --domain example.com --confirm-username example_admin --auto-yes --output json
+wp-medic --all-domains
 ```
 
-*Ví dụ Kết quả trả về (JSON):*
-```json
-{
-  "status": "success",
-  "domain": "example.com",
-  "actions": {
-    "core_nuked": true,
-    "spam_comments_deleted": 1542,
-    "db_password_rotated": true,
-    "salts_shuffled": true
-  },
-  "timestamp": "2026-05-29T15:00:00Z"
-}
+### 4. Tự động hóa hoàn toàn (Auto-yes)
+Bỏ qua mọi câu hỏi xác nhận (Y/N), tự động ép đổi tên user `admin` thành `my_admin`:
+```bash
+wp-medic --domain example.com --auto-yes --confirm-username my_admin
 ```
 
 ---
 
-## 🔒 Yêu Cầu Hệ Thống (Requirements)
-*   **Hệ điều hành:** AlmaLinux / Ubuntu / CentOS / RHEL.
-*   **Môi trường:** Plesk Obsidian (yêu cầu quyền gọi `plesk bin`).
-*   **Công cụ phụ trợ:** `wp-cli` (đã được cài đặt global), `openssl`, `jq` (để parse JSON).
+<h2 id="requirements">🔒 Yêu Cầu Hệ Thống (Requirements)</h2>
+
+- **Hệ điều hành:** AlmaLinux / Ubuntu / CentOS / Debian.
+- **Bảng điều khiển:** Hỗ trợ tốt nhất cho **Plesk Obsidian**.
+- **Yêu cầu nội bộ:** Hệ thống cần có sẵn `wp-cli` (mặc định Plesk đã có).
 
 ---
 
-## 👤 Đóng Góp & Tác Giả (Author)
+<h2 id="author">👤 Tác Giả & Đóng Góp</h2>
 
-Công cụ được thiết kế và bảo trì bởi **TuyenHT** và cộng đồng chuyên gia bảo mật.
-*   **Github:** [https://github.com/tuyenht](https://github.com/tuyenht)
+Mã nguồn được thiết kế theo tiêu chuẩn hệ thống doanh nghiệp nghiêm ngặt nhất.
+- **Tác giả:** [TuyenHT](https://github.com/tuyenht)
 
-**Disclaimer:** Công cụ can thiệp rất sâu vào Database và File System. Khuyến cáo luôn bật chế độ Backup định kỳ của Plesk trước khi sử dụng `--all-domains`. Dù hệ thống an toàn tuyệt đối nhờ cơ chế Privilege Drop (`sudo -u`), người dùng vẫn nên chạy `--dry-run` trước khi thực thi thực tế.
+*⚠️ **Khuyến cáo:** Mặc dù công cụ được thiết kế bảo vệ an toàn 100% dữ liệu người dùng, bạn vẫn luôn nên Backup (sao lưu) website trước khi thực hiện thao tác càn quét toàn Server.*
