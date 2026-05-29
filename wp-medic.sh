@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# 🛡️ DIAMOND WP-MEDIC CLI (v1.0.0)
+# 🛡️ WP-MEDIC CLI (v1.0.0)
 # Tác giả: TuyenHT
 # Chức năng: Hệ thống Thanh trừng mã độc & Tự động hóa Bảo mật WP (Plesk/Linux)
 # Github: https://github.com/tuyenht/wp-medic-cli
@@ -68,7 +68,7 @@ print_final_json() {
 
 # --- HÀM 3: PARSER (XỬ LÝ THAM SỐ CLI) ---
 show_help() {
-    echo -e "${CYAN}🛡️ WP-Medic CLI (Diamond Edition)${NC} - Cỗ máy thanh trừng mã độc WordPress."
+    echo -e "${CYAN}🛡️ WP-Medic CLI${NC} - Cỗ máy thanh trừng mã độc WordPress."
     echo "Sử dụng:"
     echo "  --domain <domain>   : (Chế độ bắn tỉa) Dọn dẹp 1 website cụ thể."
     echo "  --all-domains       : (Chế độ rải thảm) Dọn dẹp toàn bộ website trên Plesk."
@@ -119,7 +119,7 @@ bootstrap() {
         append_json "timestamp" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
     else
         echo -e "${CYAN}=================================================================${NC}"
-        echo -e "${CYAN}   🛡️ KHỞI ĐỘNG CỖ MÁY WP-MEDIC (DIAMOND STANDARD) 🛡️   ${NC}"
+        echo -e "${CYAN}   🛡️ KHỞI ĐỘNG CỖ MÁY WP-MEDIC CHUYÊN DỤNG 🛡️   ${NC}"
         echo -e "${CYAN}=================================================================${NC}"
         if [[ $DRY_RUN -eq 1 ]]; then
             echo -e "${YELLOW}>> ĐANG CHẠY TRONG CHẾ ĐỘ DRY-RUN (AN TOÀN - KHÔNG GHI/XÓA DATA) <<${NC}"

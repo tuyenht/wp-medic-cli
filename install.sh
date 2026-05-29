@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# 🚀 CÀI ĐẶT DIAMOND WP-MEDIC CLI
+# 🚀 CÀI ĐẶT WP-MEDIC CLI
 # Kho lưu trữ: https://github.com/tuyenht/wp-medic-cli
 # ==============================================================================
 
@@ -11,7 +11,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 echo -e "${CYAN}======================================================${NC}"
-echo -e "${CYAN}    BẮT ĐẦU CÀI ĐẶT: DIAMOND WP-MEDIC CLI             ${NC}"
+echo -e "${CYAN}    BẮT ĐẦU CÀI ĐẶT: WP-MEDIC CLI                     ${NC}"
 echo -e "${CYAN}======================================================${NC}"
 
 # 1. Quản lý Tham số cài đặt (Dành cho Baoson Ecosystem)
