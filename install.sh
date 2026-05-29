@@ -49,6 +49,13 @@ if [[ $? -ne 0 || ! -s "$TARGET_FILE" ]]; then
     exit 1
 fi
 
+# Xác minh file tải về thực sự là bash script (không phải trang lỗi HTML từ CDN)
+if ! head -n 1 "$TARGET_FILE" | grep -q '^#!/bin/bash'; then
+    echo -e "${RED}[LỖI] File tải về không phải mã nguồn hợp lệ (thiếu shebang). Github có thể đang lỗi, hãy thử lại sau.${NC}"
+    rm -f "$TARGET_FILE"
+    exit 1
+fi
+
 # 4. Phân quyền thực thi & Cài đặt Dependencies
 echo -e "[+] Cấp quyền thực thi (chmod +x)..."
 chmod +x "$TARGET_FILE"

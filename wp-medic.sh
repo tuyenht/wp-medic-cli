@@ -1,9 +1,10 @@
 #!/bin/bash
 # ==============================================================================
-# 🛡️ WP-MEDIC CLI (v1.0.0)
+# 🛡️ WP-MEDIC CLI (v1.1.0)
 # Tác giả: TuyenHT
 # Chức năng: Hệ thống Thanh trừng mã độc & Tự động hóa Bảo mật WP (Plesk/Linux)
 # Github: https://github.com/tuyenht/wp-medic-cli
+VERSION="1.1.0"
 # ==============================================================================
 
 # --- MÀU SẮC & GIAO DIỆN (UI) ---
@@ -68,14 +69,20 @@ print_final_json() {
 
 # --- HÀM 3: PARSER (XỬ LÝ THAM SỐ CLI) ---
 show_help() {
-    echo -e "${CYAN}🛡️ WP-Medic CLI${NC} - Cỗ máy thanh trừng mã độc WordPress."
+    echo -e "${CYAN}🛡️ WP-Medic CLI${NC} v${VERSION} - Cỗ máy thanh trừng mã độc WordPress."
     echo "Sử dụng:"
     echo "  --domain <domain>   : (Chế độ bắn tỉa) Dọn dẹp 1 website cụ thể."
     echo "  --all-domains       : (Chế độ rải thảm) Dọn dẹp toàn bộ website trên Plesk."
     echo "  --dry-run           : Phân tích giả lập, KHÔNG xóa file thực tế."
     echo "  --output json       : Trả về kết quả JSON (dành cho Telegram Bot)."
     echo "  --auto-yes, -y      : Bỏ qua các bước xác nhận, tự động chạy toàn bộ."
+    echo "  --version           : Hiển thị phiên bản hiện tại."
     echo "  --help, -h          : Hiển thị bảng trợ giúp này."
+    exit 0
+}
+
+show_version() {
+    echo "wp-medic v${VERSION}"
     exit 0
 }
 
@@ -92,6 +99,7 @@ while [[ "$#" -gt 0 ]]; do
             fi
             ;;
         --auto-yes|-y) AUTO_YES=1 ;;
+        --version) show_version ;;
         --help|-h) show_help ;;
         *) log_msg "ERROR" "Tham số không hợp lệ: $1"; exit 1 ;;
     esac
@@ -104,6 +112,12 @@ bootstrap() {
     if [[ $EUID -ne 0 ]]; then
        log_msg "ERROR" "Kịch bản này BẮT BUỘC phải chạy dưới quyền root (sudo su)."
        exit 1
+    fi
+
+    # Kiểm tra WP-CLI tồn tại (bắt buộc cho mọi thao tác)
+    if ! command -v wp &> /dev/null; then
+        log_msg "ERROR" "WP-CLI chưa được cài đặt. Hãy cài đặt trước: https://wp-cli.org/"
+        exit 1
     fi
 
     # Khởi tạo log file
@@ -285,10 +299,16 @@ process_domain() {
                 # Tạo user mới với hash random để an toàn tuyệt đối
                 local safe_pass=$(head -c 150 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32)
                 run_wp "$sys_user" "$doc_root" user create "$new_username" "$admin_email" --role=administrator --user_pass="$safe_pass" 2>/dev/null
-                # Xóa user cũ và chuyển toàn bộ data sang user mới
-                run_wp "$sys_user" "$doc_root" user delete "$admin_user" --reassign="$new_username" 2>/dev/null
                 
-                log_msg "OK" "Hoàn tất đổi Username: $admin_user -> $new_username. Toàn bộ Data được bảo toàn!"
+                # Truy xuất User ID số của user mới (WP-CLI --reassign yêu cầu ID, không phải login)
+                local new_user_id=$(run_wp "$sys_user" "$doc_root" user get "$new_username" --field=ID 2>/dev/null | tr -d '\r')
+                if [[ -n "$new_user_id" ]]; then
+                    # Xóa user cũ và chuyển toàn bộ data sang user mới bằng ID
+                    run_wp "$sys_user" "$doc_root" user delete "$admin_user" --reassign="$new_user_id" 2>/dev/null
+                    log_msg "OK" "Hoàn tất đổi Username: $admin_user -> $new_username (ID: $new_user_id). Toàn bộ Data được bảo toàn!"
+                else
+                    log_msg "ERROR" "Không thể truy xuất ID của user mới '$new_username'. Bỏ qua xóa user cũ để bảo toàn dữ liệu."
+                fi
             fi
         fi
     done
