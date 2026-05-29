@@ -1,10 +1,10 @@
 #!/bin/bash
 # ==============================================================================
-# 🛡️ WP-MEDIC CLI (v1.3.1)
+# 🛡️ WP-MEDIC CLI (v1.3.2)
 # Tác giả: TuyenHT
 # Chức năng: Hệ thống Thanh trừng mã độc & Tự động hóa Bảo mật WP (Plesk/Linux)
 # Github: https://github.com/tuyenht/wp-medic-cli
-VERSION="1.3.1"
+VERSION="1.3.2"
 # ==============================================================================
 
 # --- MÀU SẮC & GIAO DIỆN (UI) ---
@@ -347,11 +347,12 @@ process_domain() {
     
     # 4.2 Xoay MySQL Pass & Salts
     local db_user=$(run_wp "$sys_user" "$doc_root" config get DB_USER 2>/dev/null | tr -d '\r')
-    if [[ -n "$db_user" ]]; then
+    local db_name=$(run_wp "$sys_user" "$doc_root" config get DB_NAME 2>/dev/null | tr -d '\r')
+    if [[ -n "$db_user" && -n "$db_name" ]]; then
         local new_db_pass=$(head -c 100 /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 24)
         # Đảo ngược trình tự: Cập nhật wp-config.php trước khi đổi trên DB Server để tránh mất kết nối giữa chừng gây crash lệnh
         run_wp "$sys_user" "$doc_root" config set DB_PASSWORD "$new_db_pass" 2>/dev/null
-        plesk bin database --update-dbuser "$db_user" -passwd "$new_db_pass" &>/dev/null
+        plesk bin database -u "$db_name" -update_user "$db_user" -passwd "$new_db_pass" &>/dev/null
     fi
     run_wp "$sys_user" "$doc_root" config shuffle-salts 2>/dev/null
 
