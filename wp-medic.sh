@@ -1,10 +1,10 @@
 #!/bin/bash
 # ==============================================================================
-# 🛡️ WP-MEDIC CLI (v1.1.0)
+# 🛡️ WP-MEDIC CLI (v1.2.0)
 # Tác giả: TuyenHT
 # Chức năng: Hệ thống Thanh trừng mã độc & Tự động hóa Bảo mật WP (Plesk/Linux)
 # Github: https://github.com/tuyenht/wp-medic-cli
-VERSION="1.1.0"
+VERSION="1.2.0"
 # ==============================================================================
 
 # --- MÀU SẮC & GIAO DIỆN (UI) ---
@@ -263,6 +263,48 @@ process_domain() {
         append_json "core_status" "download_failed_rolled_back"
     fi
     
+    # [MODULE 3.3] ROOT DIRECTORY SANITIZATION (WHITELIST APPROACH)
+    # Chiến lược: Chỉ giữ lại các file/thư mục thuộc WP Core whitelist, tiêu diệt toàn bộ phần còn lại
+    log_msg "INFO" "-> Quét & Tiêu diệt file rác/mã độc tại Document Root (Whitelist Mode)..."
+    
+    # Danh sách file hợp lệ tại thư mục gốc WordPress Core
+    local wp_root_whitelist="index.php|wp-activate.php|wp-blog-header.php|wp-comments-post.php|wp-config.php|wp-config-sample.php|wp-cron.php|wp-links-opml.php|wp-load.php|wp-login.php|wp-mail.php|wp-settings.php|wp-signup.php|wp-trackback.php|xmlrpc.php|license.txt|readme.html|.htaccess|robots.txt|wp-cli.yml"
+    
+    # Danh sách thư mục hợp lệ tại thư mục gốc WordPress
+    local wp_dir_whitelist="wp-admin|wp-content|wp-includes|.well-known"
+    
+    # Xóa file rác (không nằm trong whitelist)
+    local rogue_count=0
+    while IFS= read -r rogue_file; do
+        local basename_file=$(basename "$rogue_file")
+        if ! echo "$basename_file" | grep -qE "^($wp_root_whitelist)$"; then
+            rm -f "$rogue_file"
+            log_msg "WARN" "   Tiêu diệt file lạ: $basename_file"
+            rogue_count=$((rogue_count + 1))
+        fi
+    done < <(find "$doc_root" -maxdepth 1 -type f 2>/dev/null)
+    
+    # Xóa thư mục lạ (không nằm trong whitelist)
+    while IFS= read -r rogue_dir; do
+        local basename_dir=$(basename "$rogue_dir")
+        if ! echo "$basename_dir" | grep -qE "^($wp_dir_whitelist)$"; then
+            rm -rf "$rogue_dir"
+            log_msg "WARN" "   Tiêu diệt thư mục lạ: $basename_dir/"
+            rogue_count=$((rogue_count + 1))
+        fi
+    done < <(find "$doc_root" -maxdepth 1 -mindepth 1 -type d ! -name '.*' 2>/dev/null)
+    
+    # Xóa file backup config nguy hiểm (lộ DB credentials)
+    rm -f "$doc_root/wp-config.php.bak" "$doc_root/wp-config.php.old" "$doc_root/wp-config.php.save" "$doc_root/wp-config.php~" 2>/dev/null
+    
+    if [[ $rogue_count -gt 0 ]]; then
+        log_msg "OK" "   Đã tiêu diệt $rogue_count đối tượng khả nghi tại Document Root."
+        append_json "rogue_files_removed" "$rogue_count"
+    else
+        log_msg "OK" "   Document Root sạch sẽ, không phát hiện file/thư mục lạ."
+    fi
+
+    # [MODULE 3.4] UPLOADS & CACHES CLEANUP
     log_msg "INFO" "-> Càn quét Uploads & Caches..."
     # Bảo toàn file .js hợp lệ của plugin giao diện, chỉ triệt tiêu 100% mã thực thi nguy hiểm
     find "$doc_root/wp-content/uploads" -type f \( -name "*.php" -o -name "*.phtml" -o -name "*.py" -o -name "*.pl" -o -name "*.suspected" \) -delete 2>/dev/null
