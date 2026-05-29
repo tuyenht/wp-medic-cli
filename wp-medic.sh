@@ -178,14 +178,20 @@ process_domain() {
     log_msg "INFO" "Đã xác thực Chủ sở hữu: $sys_user"
 
     # [MODULE 3.1] DATABASE FORENSICS
-    log_msg "INFO" "-> Khóa & Tiêu diệt Spam Comments/Pingbacks..."
-    run_wp "$sys_user" "$doc_root" db query "UPDATE wp_posts SET comment_status = 'closed', ping_status = 'closed';" 2>/dev/null
-    # Xóa comments spam rác (cần bash eval để lồng lệnh)
-    local spam_ids=$(run_wp "$sys_user" "$doc_root" comment list --status=spam --format=ids 2>/dev/null)
-    if [[ -n "$spam_ids" ]]; then
-        run_wp "$sys_user" "$doc_root" comment delete $spam_ids --force 2>/dev/null
-    fi
-    run_wp "$sys_user" "$doc_root" comment empty-trash 2>/dev/null
+    # Lấy Table Prefix thực tế của Website (chống lỗi hardcode 'wp_')
+    local db_prefix=$(run_wp "$sys_user" "$doc_root" config get table_prefix 2>/dev/null | tr -d '\r')
+    if [[ -z "$db_prefix" ]]; then db_prefix="wp_"; fi
+
+    log_msg "INFO" "-> Khóa & Tiêu diệt Spam Comments/Pingbacks (Prefix: $db_prefix)..."
+    
+    # 1. Khóa comment toàn hệ thống bằng SQL
+    run_wp "$sys_user" "$doc_root" db query "UPDATE ${db_prefix}posts SET comment_status = 'closed', ping_status = 'closed';" 2>/dev/null
+    
+    # 2. Xóa Spam/Trash Comments bằng SQL để tránh lỗi "Argument list too long" nếu có quá nhiều spam
+    run_wp "$sys_user" "$doc_root" db query "DELETE FROM ${db_prefix}comments WHERE comment_approved = 'spam' OR comment_approved = 'trash';" 2>/dev/null
+    
+    # 3. Dọn dẹp mồ côi (Orphaned Comment Meta)
+    run_wp "$sys_user" "$doc_root" db query "DELETE FROM ${db_prefix}commentmeta WHERE comment_id NOT IN (SELECT comment_ID FROM ${db_prefix}comments);" 2>/dev/null
 
     # [MODULE 3.2] FILE SYSTEM NUKE & PAVE
     log_msg "INFO" "-> Nuke & Pave (Tái tạo Core Files)..."
@@ -202,14 +208,14 @@ process_domain() {
     # [MODULE 4] IDENTITY AUTOMATION (IAM)
     log_msg "INFO" "-> Xoay vòng Mật khẩu Hệ thống & Salts (Amnesia Protocol)..."
     
-    # 4.1 Xoay Plesk SysUser
-    local new_sys_pass=$(openssl rand -base64 24)
+    # 4.1 Xoay Plesk SysUser (Password chỉ dùng chữ/số để tương thích tuyệt đối với Plesk API)
+    local new_sys_pass=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 24 | head -n 1)
     plesk bin sysuser -u "$sys_user" -passwd "$new_sys_pass" &>/dev/null
     
     # 4.2 Xoay MySQL Pass & Salts
-    local db_user=$(run_wp "$sys_user" "$doc_root" config get DB_USER 2>/dev/null)
+    local db_user=$(run_wp "$sys_user" "$doc_root" config get DB_USER 2>/dev/null | tr -d '\r')
     if [[ -n "$db_user" ]]; then
-        local new_db_pass=$(openssl rand -base64 18)
+        local new_db_pass=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 24 | head -n 1)
         plesk bin database --update-dbuser "$db_user" -passwd "$new_db_pass" &>/dev/null
         run_wp "$sys_user" "$doc_root" config set DB_PASSWORD "$new_db_pass" 2>/dev/null
     fi
@@ -222,7 +228,7 @@ process_domain() {
     
     for admin_user in $admins; do
         # 1. Quét qua và reset mọi mật khẩu Admin
-        local random_hash=$(openssl rand -base64 32)
+        local random_hash=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9!@#%^&*' | fold -w 32 | head -n 1)
         run_wp "$sys_user" "$doc_root" user update "$admin_user" --user_pass="$random_hash" 2>/dev/null
         
         # 2. Xử lý Username Nhạy cảm (Nuke-and-Reassign)
