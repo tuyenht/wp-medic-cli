@@ -1,10 +1,10 @@
 #!/bin/bash
 # ==============================================================================
-# 🛡️ WP-MEDIC CLI (v1.3.0)
+# 🛡️ WP-MEDIC CLI (v1.3.1)
 # Tác giả: TuyenHT
 # Chức năng: Hệ thống Thanh trừng mã độc & Tự động hóa Bảo mật WP (Plesk/Linux)
 # Github: https://github.com/tuyenht/wp-medic-cli
-VERSION="1.3.0"
+VERSION="1.3.1"
 # ==============================================================================
 
 # --- MÀU SẮC & GIAO DIỆN (UI) ---
@@ -267,6 +267,12 @@ process_domain() {
         if [[ -z "$doc_root_group" ]]; then doc_root_group="psacln"; fi
         chown -R "$sys_user:$doc_root_group" "$doc_root/wp-admin" "$doc_root/wp-includes" 2>/dev/null
         chown "$sys_user:$doc_root_group" "$doc_root"/*.php "$doc_root"/*.html "$doc_root"/*.txt 2>/dev/null
+        
+        # Khắc phục lỗi umask của root (027) gây ra permission 750/640 dẫn đến 403/500 trên Nginx
+        find "$doc_root/wp-admin" "$doc_root/wp-includes" -type d -exec chmod 755 {} \; 2>/dev/null
+        find "$doc_root/wp-admin" "$doc_root/wp-includes" -type f -exec chmod 644 {} \; 2>/dev/null
+        chmod 644 "$doc_root"/*.php "$doc_root"/*.html "$doc_root"/*.txt 2>/dev/null
+
         rm -rf "$backup_dir_admin" "$backup_dir_includes"
         log_msg "OK" "-> Hoàn tất tái tạo mã nguồn WordPress Core!"
     else
